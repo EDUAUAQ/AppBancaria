@@ -55,8 +55,8 @@ user.post("/login", async (req, res, next) => {
     if (user_mail && user_password) {
         try {
 
-            let query = `SELECT user_mail, password FROM users WHERE user_mail = '${user_mail}'`;
-
+            let query = `SELECT email, password FROM users WHERE email = '${user_mail}'`;
+            
             const rows = await db.query(query);
 
 
