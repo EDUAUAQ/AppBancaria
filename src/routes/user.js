@@ -50,12 +50,12 @@ user.post("/signup",async(req,res,next)=>{
 });
 
 user.post("/login", async (req, res, next) => {
-    const { user_name, user_password } = req.body;
+    const { user_mail, user_password } = req.body;
 
-    if (user_name && user_password) {
+    if (user_mail && user_password) {
         try {
 
-            let query = `SELECT user_id, password FROM users WHERE username = '${user_name}'`;
+            let query = `SELECT user_mail, password FROM users WHERE user_mail = '${user_mail}'`;
 
             const rows = await db.query(query);
 
@@ -71,7 +71,7 @@ user.post("/login", async (req, res, next) => {
                         user_mail:user.user_mail
                     },"debugkey");
 
-                    return res.status(200).json({ code: 200, token: token, message: "Inicio de Sesión Exitoso" });
+                    return res.status(200).json({ code: 200, token: token, message: "Inicio de Sesión Exitoso", userid: user.user_id });
                 } else {
                     return res.status(401).json({ code: 401, message: "Contraseña incorrecta" });
                 }
