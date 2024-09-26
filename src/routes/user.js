@@ -1,6 +1,7 @@
 const express = require('express');
 const user = express.Router();
 const db = require('../database/database');
+const jwt = require('jsonwebtoken');
 
 user.get("/profile/:user_id", async (req, res) => {
     const { user_id } = req.params;
@@ -65,9 +66,12 @@ user.post("/login", async (req, res, next) => {
 
                 if (user_password === user.password) { 
 
-                    // const token = jwt.sign({ userId: user.user_id }, 'secretKey', { expiresIn: '1h' });
+                    const token = jwt.sign({
+                        user_id: user.user_id,
+                        user_mail:user.user_mail
+                    },"debugkey");
 
-                    return res.status(200).json({ code: 200, message: "Inicio de sesión exitoso" });
+                    return res.status(200).json({ code: 200, token: token, message: "Inicio de Sesión Exitoso" });
                 } else {
                     return res.status(401).json({ code: 401, message: "Contraseña incorrecta" });
                 }
