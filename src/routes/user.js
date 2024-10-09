@@ -55,7 +55,7 @@ user.post("/login", async (req, res, next) => {
     if (user_mail && user_password) {
         try {
 
-            let query = `SELECT email, password FROM users WHERE email = '${user_mail}'`;
+            let query = `SELECT user_id, email, password FROM users WHERE email = '${user_mail}'`;
             
             const rows = await db.query(query);
 
@@ -68,10 +68,11 @@ user.post("/login", async (req, res, next) => {
 
                     const token = jwt.sign({
                         user_id: user.user_id,
-                        user_mail:user.user_mail
-                    },"debugkey");
-
-                    return res.status(200).json({ code: 200, token: token, message: "Inicio de Sesión Exitoso", userid: user.user_id });
+                        user_mail:user.email,
+                        user_password: user.password
+                    },"debugkey", {expiresIn: '30m'});
+                    console.log(token)
+                    return res.status(200).json({ code: 200, token: token, message: "Inicio de Sesión Exitoso", userId: user.user_id });
                 } else {
                     return res.status(401).json({ code: 401, message: "Contraseña incorrecta" });
                 }
