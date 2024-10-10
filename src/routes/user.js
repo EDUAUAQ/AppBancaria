@@ -71,7 +71,6 @@ user.post("/login", async (req, res, next) => {
                         user_mail:user.email,
                         user_password: user.password
                     },"debugkey", {expiresIn: '30m'});
-                    console.log(token)
                     return res.status(200).json({ code: 200, token: token, message: "Inicio de Sesión Exitoso", userId: user.user_id });
                 } else {
                     return res.status(401).json({ code: 401, message: "Contraseña incorrecta" });
