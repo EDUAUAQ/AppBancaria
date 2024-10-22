@@ -21,7 +21,6 @@ transfer.get("/:account_id", async (req, res) => {
     }
 });
 
-// Crear una nueva transferencia
 transfer.post("/create", async (req, res) => {
     const { from_account_id, to_account_id, amount, description } = req.body;
 
@@ -31,21 +30,35 @@ transfer.post("/create", async (req, res) => {
     }
 
     try {
-        // Consultar el saldo de la cuenta del remitente
-        const queryCheckBalance = `SELECT balance FROM accounts WHERE account_id = ${from_account_id}`;
-        const [fromAccount] = await db.query(queryCheckBalance);
+        // Consultar saldo y tipo de cuenta del remitente
+        const queryCheckFromAccount = `SELECT balance, account_type FROM accounts WHERE account_id = ${from_account_id}`;
+        const [fromAccount] = await db.query(queryCheckFromAccount);
 
         if (!fromAccount) {
             return res.status(404).json({ code: 404, message: "Cuenta del remitente no encontrada" });
         }
 
-        // Verificar si el saldo es suficiente
-        if (fromAccount.balance < amount ) {
-            return res.status(400).json({ code: 400, message: "Saldo insuficiente" });
+        // Verificar que la cuenta de origen no sea de crédito
+        if (fromAccount.account_type === 'Crédito') {
+            return res.status(400).json({ code: 400, message: "No se pueden hacer transferencias desde cuentas de crédito" });
         }
 
-        if (from_account_id == to_account_id ) {
+        // Verificar que la cuenta de destino no sea la misma que la de origen
+        if (from_account_id === to_account_id) {
             return res.status(400).json({ code: 400, message: "La cuenta destino no puede ser igual a la cuenta origen" });
+        }
+
+        // Consultar saldo y tipo de cuenta del destinatario
+        const queryCheckToAccount = `SELECT balance, account_type FROM accounts WHERE account_id = ${to_account_id}`;
+        const [toAccount] = await db.query(queryCheckToAccount);
+
+        if (!toAccount) {
+            return res.status(404).json({ code: 404, message: "Cuenta del destinatario no encontrada" });
+        }
+
+        // Verificar si el saldo es suficiente para cuentas que no son de crédito
+        if (fromAccount.balance < amount) {
+            return res.status(400).json({ code: 400, message: "Saldo insuficiente" });
         }
 
         // Crear la consulta SQL para insertar una nueva transferencia
@@ -57,17 +70,25 @@ transfer.post("/create", async (req, res) => {
         // Ejecutar la consulta para insertar la transferencia
         await db.query(queryInsertTransfer);
 
-        // Actualizar el saldo de las cuentas
+        // Actualizar el saldo de la cuenta remitente
         const queryUpdateFromAccount = `
             UPDATE accounts SET balance = balance - ${amount} WHERE account_id = ${from_account_id}
         `;
-        const queryUpdateToAccount = `
-            UPDATE accounts SET balance = balance + ${amount} WHERE account_id = ${to_account_id}
-        `;
-
-        // Ejecutar las actualizaciones de saldo
         await db.query(queryUpdateFromAccount);
-        await db.query(queryUpdateToAccount);
+
+        // Si la cuenta de destino es de crédito, se le resta el monto transferido (negativo es a favor)
+        if (toAccount.account_type === 'Crédito') {
+            const queryUpdateToAccount = `
+                UPDATE accounts SET balance = balance - ${amount} WHERE account_id = ${to_account_id}
+            `;
+            await db.query(queryUpdateToAccount);
+        } else {
+            // Si la cuenta de destino no es de crédito, se suma el monto transferido
+            const queryUpdateToAccount = `
+                UPDATE accounts SET balance = balance + ${amount} WHERE account_id = ${to_account_id}
+            `;
+            await db.query(queryUpdateToAccount);
+        }
 
         // Responder con éxito
         return res.status(201).json({ code: 201, message: "Transferencia realizada exitosamente" });
