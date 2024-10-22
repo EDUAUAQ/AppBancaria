@@ -4,7 +4,8 @@ const cors = require('cors')
 //Routers
 const user = require('./routes/user');
 const account = require('./routes/account');
-const transfer = require('./routes/transfers')
+const transfer = require('./routes/transfers');
+const transactions = require('./routes/transactions');
 
 //Middleware
 const auth = require('./middleware/auth');
@@ -21,6 +22,7 @@ app.use(express.json());
 
 
 app.use('/user',user);
+app.use('/transaction', transactions)
 app.use(auth);
 //Rutas Protegidas
 app.use('/account',account);
