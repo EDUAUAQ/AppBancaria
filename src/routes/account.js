@@ -1,17 +1,20 @@
 const express = require('express');
 const account = express.Router();
-const db = require('../database/database');
+const Account = require('../models/accountModel');
 
+// Obtener cuentas por user_id
 account.get("/:user_id", async (req, res) => {
     const { user_id } = req.params;
 
     try {
-        const query = `SELECT * FROM accounts WHERE user_id = ${user_id}`;
-        const accounts = await db.query(query);
-        if (accounts.length >= 0) {
+        const accounts = await Account.findAll({
+            where: { user_id }
+        });
+
+        if (accounts.length > 0) {
             return res.status(200).json({ code: 200, data: accounts });
         } else {
-            return res.status(404).json({ code: 404, message: "Usuario no encontrado" });
+            return res.status(200).json({ code: 400, data:accounts , message: "No tienes cuentas asociadas" });
         }
     } catch (error) {
         console.error(error);
@@ -19,6 +22,7 @@ account.get("/:user_id", async (req, res) => {
     }
 });
 
+// Crear una nueva cuenta
 account.post("/create", async (req, res) => {
     const { user_id, account_type, balance } = req.body;
 
@@ -44,28 +48,28 @@ account.post("/create", async (req, res) => {
         account_id = generateAccountId();
 
         // Verificar si el account_id ya existe en la base de datos
-        const queryCheck = `SELECT * FROM accounts WHERE account_id = '${account_id}'`;
-        const existingAccount = await db.query(queryCheck);
+        const existingAccount = await Account.findOne({
+            where: { account_id }
+        });
 
-        exists = existingAccount.length > 0; 
+        exists = existingAccount !== null; 
     }
 
     try {
-        // Crear la consulta SQL para insertar la nueva cuenta
-        const query = `INSERT INTO accounts (account_id, user_id, account_type, balance) VALUES ('${account_id}', ${user_id}, '${account_type}', ${balance})`;
-
-        // Ejecutar la consulta
-        await db.query(query);
+        // Crear la nueva cuenta
+        const newAccount = await Account.create({
+            account_id,
+            user_id,
+            account_type,
+            balance
+        });
 
         // Responder con éxito
-        return res.status(201).json({ code: 201, message: "Cuenta creada exitosamente", account_id });
+        return res.status(201).json({ code: 201, message: "Cuenta creada exitosamente", account_id: newAccount.account_id });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ code: 500, message: "Error en el servidor" });
     }
 });
-
-
-
 
 module.exports = account;

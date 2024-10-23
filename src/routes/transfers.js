@@ -1,16 +1,24 @@
 const express = require('express');
 const transfer = express.Router();
-const db = require('../database/database');
+const { Op } = require('sequelize');
+const Transfer = require('../models/transferModel'); // Modelo de transferencia
+const Account = require('../models/accountModel'); // Modelo de cuenta
 
 // Obtener todas las transferencias de una cuenta (por account_id)
 transfer.get("/:account_id", async (req, res) => {
     const { account_id } = req.params;
 
     try {
-        const query = `SELECT * FROM transfers WHERE from_account_id = ${account_id} OR to_account_id = ${account_id}`;
-        const transfers = await db.query(query);
+        const transfers = await Transfer.findAll({
+            where: {
+                [Op.or]: [
+                    { from_account_id: account_id },
+                    { to_account_id: account_id }
+                ]
+            }
+        });
 
-        if (transfers.length >= 0) {
+        if (transfers.length > 0) {
             return res.status(200).json({ code: 200, data: transfers });
         } else {
             return res.status(404).json({ code: 404, message: "No se encontraron transferencias para la cuenta" });
@@ -21,6 +29,7 @@ transfer.get("/:account_id", async (req, res) => {
     }
 });
 
+// Crear transferencia
 transfer.post("/create", async (req, res) => {
     const { from_account_id, to_account_id, amount, description } = req.body;
 
@@ -31,8 +40,7 @@ transfer.post("/create", async (req, res) => {
 
     try {
         // Consultar saldo y tipo de cuenta del remitente
-        const queryCheckFromAccount = `SELECT balance, account_type FROM accounts WHERE account_id = ${from_account_id}`;
-        const [fromAccount] = await db.query(queryCheckFromAccount);
+        const fromAccount = await Account.findOne({ where: { account_id: from_account_id } });
 
         if (!fromAccount) {
             return res.status(404).json({ code: 404, message: "Cuenta del remitente no encontrada" });
@@ -49,8 +57,7 @@ transfer.post("/create", async (req, res) => {
         }
 
         // Consultar saldo y tipo de cuenta del destinatario
-        const queryCheckToAccount = `SELECT balance, account_type FROM accounts WHERE account_id = ${to_account_id}`;
-        const [toAccount] = await db.query(queryCheckToAccount);
+        const toAccount = await Account.findOne({ where: { account_id: to_account_id } });
 
         if (!toAccount) {
             return res.status(404).json({ code: 404, message: "Cuenta del destinatario no encontrada" });
@@ -61,43 +68,44 @@ transfer.post("/create", async (req, res) => {
             return res.status(400).json({ code: 400, message: "Saldo insuficiente" });
         }
 
-        // Crear la consulta SQL para insertar una nueva transferencia
-        const queryInsertTransfer = `
-            INSERT INTO transfers (from_account_id, to_account_id, amount, description) 
-            VALUES (${from_account_id}, ${to_account_id}, ${amount}, '${description}')
-        `;
+        // Crear la nueva transferencia
+        const transferData = await Transfer.create({
+            from_account_id,
+            to_account_id,
+            amount,
+            description
+        });
 
-        // Ejecutar la consulta para insertar la transferencia
-        await db.query(queryInsertTransfer);
-
+        
+        const newBalanceFrom = parseFloat(fromAccount.balance) - parseFloat(amount)
         // Actualizar el saldo de la cuenta remitente
-        const queryUpdateFromAccount = `
-            UPDATE accounts SET balance = balance - ${amount} WHERE account_id = ${from_account_id}
-        `;
-        await db.query(queryUpdateFromAccount);
+        await Account.update(
+            { balance: newBalanceFrom },
+            { where: { account_id: from_account_id } }
+        );
 
-        // Si la cuenta de destino es de crédito, se le resta el monto transferido (negativo es a favor)
+        // Actualizar el saldo de la cuenta de destino
         if (toAccount.account_type === 'Crédito') {
-            const queryUpdateToAccount = `
-                UPDATE accounts SET balance = balance - ${amount} WHERE account_id = ${to_account_id}
-            `;
-            await db.query(queryUpdateToAccount);
+            const newBalance = parseFloat(toAccount.balance) - parseFloat(amount)
+            await Account.update(
+                { balance: newBalance },
+                { where: { account_id: to_account_id } }
+            );
         } else {
-            // Si la cuenta de destino no es de crédito, se suma el monto transferido
-            const queryUpdateToAccount = `
-                UPDATE accounts SET balance = balance + ${amount} WHERE account_id = ${to_account_id}
-            `;
-            await db.query(queryUpdateToAccount);
+            const newBalance = parseFloat(toAccount.balance) + parseFloat(amount)
+            await Account.update(
+                { balance: newBalance },
+                { where: { account_id: to_account_id } }
+            );
         }
 
         // Responder con éxito
-        return res.status(201).json({ code: 201, message: "Transferencia realizada exitosamente" });
+        return res.status(201).json({ code: 201, message: "Transferencia realizada exitosamente", transferData });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ code: 500, message: "Error en el servidor" });
     }
 });
-
 
 // Eliminar una transferencia por transfer_id
 transfer.delete("/:transfer_id", async (req, res) => {
@@ -105,16 +113,14 @@ transfer.delete("/:transfer_id", async (req, res) => {
 
     try {
         // Verificar si la transferencia existe
-        const queryCheck = `SELECT * FROM transfers WHERE transfer_id = ${transfer_id}`;
-        const transfer = await db.query(queryCheck);
+        const transfer = await Transfer.findOne({ where: { transfer_id } });
 
-        if (transfer.length === 0) {
+        if (!transfer) {
             return res.status(404).json({ code: 404, message: "Transferencia no encontrada" });
         }
 
         // Eliminar la transferencia
-        const query = `DELETE FROM transfers WHERE transfer_id = ${transfer_id}`;
-        await db.query(query);
+        await Transfer.destroy({ where: { transfer_id } });
 
         return res.status(200).json({ code: 200, message: "Transferencia eliminada exitosamente" });
     } catch (error) {

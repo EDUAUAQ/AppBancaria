@@ -1,76 +1,90 @@
 const express = require('express');
 const user = express.Router();
-const db = require('../database/database');
+const User = require('../models/userModel'); // Importa el modelo User
+const UserRole = require('../models/userRolesModel')
 const jwt = require('jsonwebtoken');
+const db = require('../database/database'); // Para la consulta SQL directa en roles
 
+// GET /profile/:user_id
 user.get("/profile/:user_id", async (req, res) => {
     const { user_id } = req.params;
 
     try {
-        const query = `SELECT user_id, username, email, first_name, last_name FROM users WHERE user_id = ${user_id}`;
-        const user = await db.query(query);
+        // Busca al usuario por su ID usando Sequelize
+        const user = await User.findOne({
+            attributes: ['user_id', 'username', 'email', 'first_name', 'last_name'],
+            where: { user_id }
+        });
 
-        if (user.length > 0) {
-            return res.status(200).json({ code: 200, data: user[0] });
+        if (user) {
+            return res.status(200).json({ code: 200, data: user });
         } else {
             return res.status(404).json({ code: 404, message: "Usuario no encontrado" });
         }
     } catch (error) {
-        console.error(error);
         return res.status(500).json({ code: 500, message: "Error en el servidor" });
     }
 });
 
+// POST /signup
+user.post("/signup", async (req, res) => {
+    const { user_name, user_mail, user_password, first_name, last_name } = req.body;
 
-user.post("/signup",async(req,res,next)=>{
-    const {user_name, user_mail, user_password, first_name, last_name} = req.body;
+    if (user_name && user_mail && user_password && first_name && last_name) {
+        try {
+            // Crea el nuevo usuario con Sequelize
+            const newUser = await User.create({
+                username: user_name,
+                email: user_mail,
+                password: user_password,
+                first_name,
+                last_name
+            });
 
-    if(user_name && user_mail && user_password && first_name && last_name){
-        //Insert New User into Users
-        let query = `INSERT INTO users(username, email, password, first_name, last_name) VALUES ('${user_name}','${user_mail}','${user_password}', '${first_name}', '${last_name}');`;
+            // Inserta el nuevo usuario en un rol específico (usando consulta SQL directa)
+            const newUserRole = {
+                user_id: newUser.user_id,
+                role_id: 2
+            };
+            
+            try {
+                await UserRole.create(newUserRole);
+                console.log('Role inserted successfully');
+            } catch (error) {
+                console.error('Error inserting role:', error);
+            }
 
-        const rows = await db.query(query);
-
-        //Get New User Id
-        query = `SELECT user_id FROM users WHERE username = '${user_name}';`
-
-        const newUserId = await db.query(query);
-
-        //Insert new user into a role
-        query = `INSERT INTO userroles(user_id,role_id) VALUES (${newUserId[0].user_id}, 2)`
-
-        const rolesrows = await db.query(query);
-
-        if(rows.affectedRows == 1 && rolesrows.affectedRows == 1){
-            return res.status(201).json({code:201, message:"Usuario registrado correctamente"});
+            return res.status(201).json({ code: 201, message: "Usuario registrado correctamente" });
+        } catch (error) {
+            return res.status(500).json({ code: 500, message: "Ocurrió un error al registrar el usuario" });
         }
-        return res.status(500).json({code:500, message:"Ocurrio un error"});
+    } else {
+        return res.status(400).json({ code: 400, message: "Campos incompletos" });
     }
-    return res.status(500).json({code:500, message:"Campos Incompletos"});
 });
 
-user.post("/login", async (req, res, next) => {
+// POST /login
+user.post("/login", async (req, res) => {
     const { user_mail, user_password } = req.body;
 
     if (user_mail && user_password) {
         try {
+            // Busca al usuario por email usando Sequelize
+            const user = await User.findOne({
+                attributes: ['user_id', 'email', 'password'],
+                where: { email: user_mail }
+            });
 
-            let query = `SELECT user_id, email, password FROM users WHERE email = '${user_mail}'`;
-            
-            const rows = await db.query(query);
-
-
-            if (rows.length > 0) {
-                const user = rows[0];
-
-
-                if (user_password === user.password) { 
-
+            if (user) {
+                // Verifica la contraseña (en un entorno real deberías usar hashes)
+                if (user_password === user.password) {
+                    // Genera el token JWT
                     const token = jwt.sign({
                         user_id: user.user_id,
-                        user_mail:user.email,
+                        user_mail: user.email,
                         user_password: user.password
-                    },"debugkey", {expiresIn: '30m'});
+                    }, "debugkey", { expiresIn: '30m' });
+
                     return res.status(200).json({ code: 200, token: token, message: "Inicio de Sesión Exitoso", userId: user.user_id });
                 } else {
                     return res.status(401).json({ code: 401, message: "Contraseña incorrecta" });
@@ -79,13 +93,11 @@ user.post("/login", async (req, res, next) => {
                 return res.status(404).json({ code: 404, message: "Usuario no encontrado" });
             }
         } catch (error) {
-            console.error(error);
             return res.status(500).json({ code: 500, message: "Ocurrió un error en el servidor" });
         }
     }
 
     return res.status(400).json({ code: 400, message: "Campos incompletos" });
 });
-
 
 module.exports = user;

@@ -1,15 +1,13 @@
-const mysql = require('mysql');
-const util = require('util');
 require('dotenv').config();
+const { Sequelize } = require('sequelize');
 
-const pool = mysql.createPool({
-    connectionLimit: 20,
+// Configura la conexión a tu base de datos con Sequelize
+const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASSWORD, {
     host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME
-});  
+    dialect: 'mysql',  // Cambia a 'postgres' si usas PostgreSQL
+    define: {
+        freezeTableName: true,  // Evita que Sequelize cambie el nombre de las tablas
+    }
+});
 
-pool.query = util.promisify(pool.query);
-
-module.exports = pool;
+module.exports = sequelize;

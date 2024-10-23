@@ -1,6 +1,7 @@
 const express = require('express');
 const morgan = require('morgan');
 const cors = require('cors')
+const sequelize = require('./database/database');
 //Routers
 const user = require('./routes/user');
 const account = require('./routes/account');
@@ -29,4 +30,13 @@ app.use('/account',account);
 app.use('/transfer',transfer)
 app.use(notFound);
 
-app.listen(PORT, ()=>{console.log(`Server listening on port ${PORT}`)})
+sequelize.sync()
+    .then(() => {
+        console.log('Conexión con la base de datos establecida.');
+        app.listen(3000, () => {
+        console.log('Servidor ejecutándose en el puerto 3000');
+        });
+    })
+    .catch(err => {
+        console.error('Error conectando con la base de datos:', err);
+    });

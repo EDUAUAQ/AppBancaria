@@ -1,15 +1,17 @@
 const express = require('express');
 const transaction = express.Router();
-const db = require('../database/database');
+const Transaction = require('../models/transactionModel'); // Asegúrate de que la ruta sea correcta
+const Account = require('../models/accountModel'); // Para consultar el saldo de la cuenta
 
-// Obtener transacciones
+// Obtener transacciones por account_id
 transaction.get("/:account_id", async (req, res) => {
     const { account_id } = req.params;
 
     try {
         // Consultar transacciones por account_id
-        const query = `SELECT * FROM transactions WHERE account_id = ${account_id}`;
-        const transactions = await db.query(query);
+        const transactions = await Transaction.findAll({
+            where: { account_id }
+        });
 
         if (transactions.length > 0) {
             return res.status(200).json({ code: 200, data: transactions });
@@ -27,7 +29,7 @@ transaction.post("/create", async (req, res) => {
     let { account_id, transaction_type, amount, description } = req.body;
 
     // Verificar si los datos requeridos están presentes
-    if (!account_id || !transaction_type || !amount) {
+    if (!account_id || !transaction_type || amount === undefined) {
         return res.status(400).json({ code: 400, message: "Datos incompletos" });
     }
 
@@ -38,8 +40,9 @@ transaction.post("/create", async (req, res) => {
 
     try {
         // Consultar saldo y tipo de cuenta
-        const queryCheckAccount = `SELECT balance, account_type FROM accounts WHERE account_id = ${account_id}`;
-        const [account] = await db.query(queryCheckAccount);
+        const account = await Account.findOne({
+            where: { account_id }
+        });
 
         if (!account) {
             return res.status(404).json({ code: 404, message: "Cuenta no encontrada" });
@@ -56,29 +59,29 @@ transaction.post("/create", async (req, res) => {
             if (account.account_type === 'Débito' && account.balance < amount) {
                 return res.status(400).json({ code: 400, message: "Saldo insuficiente para la compra" });
             }
-
         }
 
-        // Crear la consulta SQL para insertar una nueva transacción
-        const queryInsertTransaction = `
-            INSERT INTO transactions (account_id, transaction_type, amount, transaction_date, description) 
-            VALUES (${account_id}, '${transaction_type}', ${amount}, NOW(), '${description}')
-        `;
-
-        // Ejecutar la consulta para insertar la transacción
-        await db.query(queryInsertTransaction);
-
-        if (account.account_type === 'Débito') {
-            amount = -amount; // Convertir a negativo para el saldo
-        }
+        // Crear la nueva transacción
+        const newTransaction = await Transaction.create({
+            account_id,
+            transaction_type,
+            amount,
+            description
+        });
 
         // Actualizar el saldo de la cuenta
-        const queryUpdateAccount = `
-            UPDATE accounts SET balance = balance + ${amount} WHERE account_id = ${account_id}
-        `;
-        await db.query(queryUpdateAccount);
+        let newBalance = account.balance;
+        if (account.account_type === 'Débito') {
+            newBalance = parseFloat(newBalance) - parseFloat(amount); // Resta el monto en caso de cuenta de débito
+        } else {
+            newBalance = parseFloat(newBalance) + parseFloat(amount); // Suma el monto en caso de cuenta de crédito
+        }
 
-        
+        // Actualizar el saldo en la base de datos
+        await Account.update({ balance: newBalance }, {
+            where: { account_id }
+        });
+
         // Responder con éxito
         return res.status(201).json({ code: 201, message: "Transacción realizada exitosamente" });
     } catch (error) {
@@ -86,6 +89,5 @@ transaction.post("/create", async (req, res) => {
         return res.status(500).json({ code: 500, message: "Error en el servidor" });
     }
 });
-
 
 module.exports = transaction;
