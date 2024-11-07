@@ -71,7 +71,7 @@ user.post("/login", async (req, res) => {
         try {
             // Busca al usuario por email usando Sequelize
             const user = await User.findOne({
-                attributes: ['user_id', 'email', 'password'],
+                attributes: ['user_id', 'email', 'password', 'first_name'],
                 where: { email: user_mail }
             });
 
@@ -84,8 +84,7 @@ user.post("/login", async (req, res) => {
                         user_mail: user.email,
                         user_password: user.password
                     }, "debugkey", { expiresIn: '30m' });
-
-                    return res.status(200).json({ code: 200, token: token, message: "Inicio de Sesión Exitoso", userId: user.user_id });
+                    return res.status(200).json({ code: 200, token: token, message: "Inicio de Sesión Exitoso", userId: user.user_id, userName: user.first_name });
                 } else {
                     return res.status(401).json({ code: 401, message: "Contraseña incorrecta" });
                 }
