@@ -17,7 +17,12 @@ const app = express();
 
 const PORT = process.env.DB_PORT || 3000;
 
-app.use(cors());
+// app.use(cors());
+app.use(cors({
+    origin: true, // Solo permitir solicitudes desde tu dominio
+    methods: ['GET', 'POST', 'PUT', 'DELETE'], // Métodos permitidos
+    credentials: true // Permite el uso de cookies o credenciales si las estás enviando
+}));
 app.use(morgan('dev'))
 app.use(express.json());
 
@@ -33,8 +38,8 @@ app.use(notFound);
 sequelize.sync()
     .then(() => {
         console.log('Conexión con la base de datos establecida.');
-        app.listen(3000, () => {
-        console.log('Servidor ejecutándose en el puerto 3000');
+        app.listen(PORT, () => {
+        console.log(`Servidor ejecutándose en el puerto ${PORT}`);
         });
     })
     .catch(err => {
