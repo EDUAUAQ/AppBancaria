@@ -37,7 +37,7 @@ app.use(notFound);
 
 sequelize.sync()
     .then(() => {
-        console.log('Conexión con la base de datos establecida.');
+        console.log('Conexión con la base de datos establecida');
         app.listen(PORT, () => {
         console.log(`Servidor ejecutándose en el puerto ${PORT}`);
         });
