@@ -1,6 +1,6 @@
 require('dotenv').config();
 const { Sequelize } = require('sequelize');
-import mysql2 from 'mysql2';
+const mysql2 = require('mysql2');
 
 // Configura la conexión a tu base de datos con Sequelize
 const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASSWORD, {

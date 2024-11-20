@@ -22,6 +22,29 @@ account.get("/:user_id", async (req, res) => {
     }
 });
 
+// Obtener detalles de una cuenta por account_id
+account.get("/details/:account_id", async (req, res) => {
+    const { account_id } = req.params;
+
+    try {
+        // Buscar la cuenta por account_id
+        const accountDetails = await Account.findOne({
+            where: { account_id }
+        });
+
+        // Verificar si la cuenta existe
+        if (accountDetails) {
+            console.log(accountDetails)
+            return res.status(200).json({ code: 200, data: accountDetails });
+        } else {
+            return res.status(404).json({ code: 404, message: "La cuenta no existe" });
+        }
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ code: 500, message: "Error en el servidor" });
+    }
+});
+
 // Crear una nueva cuenta
 account.post("/create", async (req, res) => {
     const { user_id, account_type, balance } = req.body;
