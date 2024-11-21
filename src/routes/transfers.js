@@ -64,7 +64,7 @@ transfer.post("/create", async (req, res) => {
         }
 
         // Verificar si el saldo es suficiente para cuentas que no son de crédito
-        if (fromAccount.balance < amount) {
+        if (parseFloat(fromAccount.balance) < parseFloat(amount)) {
             return res.status(400).json({ code: 400, message: "Saldo insuficiente" });
         }
 

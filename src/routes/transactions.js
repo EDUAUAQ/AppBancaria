@@ -43,6 +43,7 @@ transaction.post("/create", async (req, res) => {
         const account = await Account.findOne({
             where: { account_id }
         });
+        
 
         if (!account) {
             return res.status(404).json({ code: 404, message: "Cuenta no encontrada" });
@@ -51,7 +52,8 @@ transaction.post("/create", async (req, res) => {
         // Lógica para cuentas de débito y crédito
         if (transaction_type === 'Retiro') {
             // Para retiros, verificar que el saldo sea suficiente si es cuenta de débito
-            if (account.account_type === 'Débito' && account.balance < amount) {
+            if (account.account_type === 'Débito' && parseFloat(account.balance) < parseFloat(amount)) {
+                console.log("adios")
                 return res.status(400).json({ code: 400, message: "Saldo insuficiente para el retiro" });
             }
         } else if (transaction_type === 'Compra') {
